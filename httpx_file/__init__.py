@@ -1,7 +1,7 @@
+import asyncio
 from pathlib import Path
 from typing import Optional, Tuple
 
-import aiofiles
 import httpx
 
 __version__ = 0, 2, 0
@@ -101,8 +101,8 @@ class FileTransport(AsyncBaseTransport, BaseTransport):
             ospath = Path("/".join(parts))
 
             try:
-                async with aiofiles.open(ospath, mode="rb") as f:
-                    content = await f.read()
+                loop = asyncio.get_event_loop()
+                content = await loop.run_in_executor(None, ospath.read_bytes)
                 status = 200  # OK
             except FileNotFoundError:
                 status = 404  # Not Found
