@@ -1,5 +1,5 @@
-from typing import Optional, Tuple
 from pathlib import Path
+from typing import Optional, Tuple
 
 import aiofiles
 import httpx
@@ -19,31 +19,33 @@ def is_absolute_url(self):
 httpx.URL.is_relative_url = property(is_relative_url)  # type: ignore
 httpx.URL.is_absolute_url = property(is_absolute_url)  # type: ignore
 
-from httpx._utils import URLPattern
 from httpx import (
     AsyncBaseTransport,
     BaseTransport,
     ByteStream,
-    Client as _Client,
-    AsyncClient as _AsyncClient,
     Request,
     Response,
 )
+from httpx import (
+    AsyncClient as _AsyncClient,
+)
+from httpx import (
+    Client as _Client,
+)
+from httpx._utils import URLPattern
 
 
 class FileTransport(AsyncBaseTransport, BaseTransport):
-    '''Transport for file URIs.
-    '''
+    """Transport for file URIs."""
 
     def _handle(self, request: Request) -> Tuple[Optional[int], httpx.Headers]:
+        if request.url.host and request.url.host != "localhost":
+            raise NotImplementedError("Only local paths are allowed")
 
-        if request.url.host and request.url.host != 'localhost':
-            raise NotImplementedError('Only local paths are allowed')
-
-        if request.method in {'PUT', 'DELETE'}:
+        if request.method in {"PUT", "DELETE"}:
             status = 501  # Not Implemented
 
-        elif request.method not in {'GET', 'HEAD'}:
+        elif request.method not in {"GET", "HEAD"}:
             # raise TransportError(f'Invalid request method: {method}')
             status = 405  # Method Not Allowed
 
@@ -57,14 +59,14 @@ class FileTransport(AsyncBaseTransport, BaseTransport):
         stream = None
 
         if not status:
-            parts = request.url.path.split('/')
+            parts = request.url.path.split("/")
 
             # check if it's a Windows absolute path
-            if parts[1].endswith((':', '|')):
-                parts[1] = parts[1][:-1] + ':'
+            if parts[1].endswith((":", "|")):
+                parts[1] = parts[1][:-1] + ":"
                 parts.pop(0)
 
-            ospath = Path('/'.join(parts))
+            ospath = Path("/".join(parts))
 
             try:
                 content = ospath.read_bytes()
@@ -75,7 +77,7 @@ class FileTransport(AsyncBaseTransport, BaseTransport):
                 status = 403  # Forbidden
             else:
                 stream = ByteStream(content)
-                headers['Content-Length'] = str(len(content))
+                headers["Content-Length"] = str(len(content))
 
         return Response(
             status_code=status,
@@ -89,17 +91,17 @@ class FileTransport(AsyncBaseTransport, BaseTransport):
         stream = None
 
         if not status:
-            parts = request.url.path.split('/')
+            parts = request.url.path.split("/")
 
             # check if it's a Windows absolute path
-            if parts[1].endswith((':', '|')):
-                parts[1] = parts[1][:-1] + ':'
+            if parts[1].endswith((":", "|")):
+                parts[1] = parts[1][:-1] + ":"
                 parts.pop(0)
 
-            ospath = Path('/'.join(parts))
+            ospath = Path("/".join(parts))
 
             try:
-                async with aiofiles.open(ospath, mode='rb') as f:
+                async with aiofiles.open(ospath, mode="rb") as f:
                     content = await f.read()
                 status = 200  # OK
             except FileNotFoundError:
@@ -108,7 +110,7 @@ class FileTransport(AsyncBaseTransport, BaseTransport):
                 status = 403  # Forbidden
             else:
                 stream = ByteStream(content)
-                headers['Content-Length'] = str(len(content))
+                headers["Content-Length"] = str(len(content))
 
         return Response(
             status_code=status,
@@ -119,23 +121,21 @@ class FileTransport(AsyncBaseTransport, BaseTransport):
 
 
 class Client(_Client):
-
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.mount('file://', FileTransport())
+        self.mount("file://", FileTransport())
 
     def mount(self, protocol: str, transport: BaseTransport) -> None:
         self._mounts.update({URLPattern(protocol): transport})
 
 
 class AsyncClient(_AsyncClient):
-
     def __init__(self, **kwargs) -> None:
         super().__init__(**kwargs)
-        self.mount('file://', FileTransport())
+        self.mount("file://", FileTransport())
 
     def mount(self, protocol: str, transport: AsyncBaseTransport) -> None:
         self._mounts.update({URLPattern(protocol): transport})
 
 
-__all__ = ['FileTransport', 'AsyncClient', 'Client']
+__all__ = ["FileTransport", "AsyncClient", "Client"]
